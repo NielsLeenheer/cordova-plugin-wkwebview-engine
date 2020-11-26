@@ -29,59 +29,6 @@
 #define CDV_BRIDGE_NAME @"cordova"
 #define CDV_IONIC_STOP_SCROLL @"stopScroll"
 
-#if __IPHONE_OS_VERSION_MAX_ALLOWED >= 110000
-
-@implementation UIScrollView (BugIOS11)
-
-+ (void)load {
-    if (@available(iOS 11.0, *)) {
-        static dispatch_once_t onceToken;
-        dispatch_once(&onceToken, ^{
-            Class class = [self class];
-            SEL originalSelector = @selector(init);
-            SEL swizzledSelector = @selector(xxx_init);
-
-            Method originalMethod = class_getInstanceMethod(class, originalSelector);
-            Method swizzledMethod = class_getInstanceMethod(class, swizzledSelector);
-
-            BOOL didAddMethod =
-            class_addMethod(class,
-                            originalSelector,
-                            method_getImplementation(swizzledMethod),
-                            method_getTypeEncoding(swizzledMethod));
-
-            if (didAddMethod) {
-                class_replaceMethod(class,
-                                    swizzledSelector,
-                                    method_getImplementation(originalMethod),
-                                    method_getTypeEncoding(originalMethod));
-            } else {
-                method_exchangeImplementations(originalMethod, swizzledMethod);
-            }
-        });
-    }
-}
-
-#pragma mark - Method Swizzling
-
-- (id)xxx_init {
-    id a = [self xxx_init];
-    if (@available(iOS 11.0, *)) {
-        NSArray *stack = [NSThread callStackSymbols];
-        for(NSString *trace in stack) {
-            if([trace containsString:@"WebKit"]) {
-                [a setContentInsetAdjustmentBehavior:UIScrollViewContentInsetAdjustmentNever];
-                break;
-            }
-        }
-    }
-    return a;
-}
-
-@end
-
-#endif
-
 
 @interface CDVWKWeakScriptMessageHandler : NSObject <WKScriptMessageHandler>
 
@@ -116,9 +63,6 @@
         if (NSClassFromString(@"WKWebView") == nil) {
             return nil;
         }
-        if(!IsAtLeastiOSVersion(@"9.0")) {
-            return nil;
-        }
         self.frame = frame;
         self.webServer = [[GCDWebServer alloc] init];
         [self.webServer addGETHandlerForBasePath:@"/" directoryPath:@"/" indexFilename:nil cacheAge:3600 allowRangeRequests:YES];
@@ -137,32 +81,14 @@
 {
     WKWebViewConfiguration* configuration = [[WKWebViewConfiguration alloc] init];
     configuration.processPool = [[CDVWKProcessPoolFactory sharedFactory] sharedProcessPool];
-#if __IPHONE_OS_VERSION_MAX_ALLOWED >= 110000
-    if(@available(iOS 10.0, *)) {
-        configuration.mediaTypesRequiringUserActionForPlayback = WKAudiovisualMediaTypeNone;
-    }else{
-        configuration.mediaPlaybackRequiresUserAction = YES;
-    }
-#else
-    configuration.mediaTypesRequiringUserActionForPlayback = WKAudiovisualMediaTypeNone;
-#endif
-
     if (settings == nil) {
         return configuration;
     }
 
-    NSString *userAgent = configuration.applicationNameForUserAgent;
-    if (
-        [settings cordovaSettingForKey:@"OverrideUserAgent"] == nil &&
-        [settings cordovaSettingForKey:@"AppendUserAgent"] != nil
-        ) {
-        userAgent = [NSString stringWithFormat:@"%@ %@", userAgent, [settings cordovaSettingForKey:@"AppendUserAgent"]];
-    }
-    configuration.applicationNameForUserAgent = userAgent;
-
-    configuration.allowsInlineMediaPlayback = [settings cordovaBoolSettingForKey:@"AllowInlineMediaPlayback" defaultValue:YES];
+    configuration.allowsInlineMediaPlayback = [settings cordovaBoolSettingForKey:@"AllowInlineMediaPlayback" defaultValue:NO];
+    configuration.mediaPlaybackRequiresUserAction = [settings cordovaBoolSettingForKey:@"MediaPlaybackRequiresUserAction" defaultValue:YES];
     configuration.suppressesIncrementalRendering = [settings cordovaBoolSettingForKey:@"SuppressesIncrementalRendering" defaultValue:NO];
-    configuration.allowsAirPlayForMediaPlayback = [settings cordovaBoolSettingForKey:@"MediaPlaybackAllowsAirPlay" defaultValue:YES];
+    configuration.mediaPlaybackAllowsAirPlay = [settings cordovaBoolSettingForKey:@"MediaPlaybackAllowsAirPlay" defaultValue:YES];
     return configuration;
 }
 
@@ -206,19 +132,11 @@
 
     // re-create WKWebView, since we need to update configuration
     WKWebView* wkWebView = [[WKWebView alloc] initWithFrame:self.frame configuration:configuration];
-
-    #if __IPHONE_OS_VERSION_MAX_ALLOWED >= 110000
-    if (@available(iOS 11.0, *)) {
-      [wkWebView.scrollView setContentInsetAdjustmentBehavior:UIScrollViewContentInsetAdjustmentNever];
-    }
-    #endif
-
     wkWebView.UIDelegate = self.uiDelegate;
     self.engineWebView = wkWebView;
 
-    NSString * overrideUserAgent = [settings cordovaSettingForKey:@"OverrideUserAgent"];
-    if (overrideUserAgent != nil) {
-        wkWebView.customUserAgent = overrideUserAgent;
+    if (IsAtLeastiOSVersion(@"9.0") && [self.viewController isKindOfClass:[CDVViewController class]]) {
+        wkWebView.customUserAgent = ((CDVViewController*) self.viewController).userAgent;
     }
 
     if ([self.viewController conformsToProtocol:@protocol(WKUIDelegate)]) {
@@ -235,10 +153,6 @@
         [wkWebView.configuration.userContentController addScriptMessageHandler:(id < WKScriptMessageHandler >)self.viewController name:CDV_BRIDGE_NAME];
     }
 
-    if (![settings cordovaBoolSettingForKey:@"KeyboardDisplayRequiresUserAction" defaultValue:YES]) {
-        [self keyboardDisplayDoesNotRequireUserAction];
-    }
-
     [self updateSettings:settings];
 
     // check if content thread has died on resume
@@ -251,18 +165,6 @@
     NSLog(@"Using Ionic WKWebView");
 
     [self addURLObserver];
-}
-
-// https://github.com/Telerik-Verified-Plugins/WKWebView/commit/04e8296adeb61f289f9c698045c19b62d080c7e3#L609-L620
-- (void) keyboardDisplayDoesNotRequireUserAction {
-		SEL sel = sel_getUid("_startAssistingNode:userIsInteracting:blurPreviousNode:userObject:");
-  	Class WKContentView = NSClassFromString(@"WKContentView");
-  	Method method = class_getInstanceMethod(WKContentView, sel);
-  	IMP originalImp = method_getImplementation(method);
-  	IMP imp = imp_implementationWithBlock(^void(id me, void* arg0, BOOL arg1, BOOL arg2, id arg3) {
-    		((void (*)(id, SEL, void*, BOOL, BOOL, id))originalImp)(me, sel, arg0, TRUE, arg2, arg3);
-  	});
-  	method_setImplementation(method, imp);
 }
 
 - (void)onReset {
@@ -353,22 +255,6 @@ static void * KVOContext = &KVOContext;
 - (void)updateSettings:(NSDictionary*)settings
 {
     WKWebView* wkWebView = (WKWebView*)_engineWebView;
-
-    // By default, DisallowOverscroll is false (thus bounce is allowed)
-    BOOL bounceAllowed = !([settings cordovaBoolSettingForKey:@"DisallowOverscroll" defaultValue:NO]);
-
-    // prevent webView from bouncing
-    if (!bounceAllowed) {
-        if ([wkWebView respondsToSelector:@selector(scrollView)]) {
-            ((UIScrollView*)[wkWebView scrollView]).bounces = NO;
-        } else {
-            for (id subview in wkWebView.subviews) {
-                if ([[subview class] isSubclassOfClass:[UIScrollView class]]) {
-                    ((UIScrollView*)subview).bounces = NO;
-                }
-            }
-        }
-    }
 
     wkWebView.configuration.preferences.minimumFontSize = [settings cordovaFloatSettingForKey:@"MinimumFontSize" defaultValue:0.0];
     wkWebView.allowsLinkPreview = [settings cordovaBoolSettingForKey:@"AllowLinkPreview" defaultValue:NO];
@@ -561,10 +447,8 @@ static void * KVOContext = &KVOContext;
 
 - (void)webView:(WKWebView*)webView didFinishNavigation:(WKNavigation*)navigation
 {
-    #ifndef __CORDOVA_6_0_0
-        CDVViewController* vc = (CDVViewController*)self.viewController;
-        [CDVUserAgentUtil releaseLock:vc.userAgentLockToken];
-    #endif
+    CDVViewController* vc = (CDVViewController*)self.viewController;
+    [CDVUserAgentUtil releaseLock:vc.userAgentLockToken];
 
     [[NSNotificationCenter defaultCenter] postNotification:[NSNotification notificationWithName:CDVPageDidLoadNotification object:webView]];
 }
@@ -577,9 +461,7 @@ static void * KVOContext = &KVOContext;
 - (void)webView:(WKWebView*)theWebView didFailNavigation:(WKNavigation*)navigation withError:(NSError*)error
 {
     CDVViewController* vc = (CDVViewController*)self.viewController;
-    #ifndef __CORDOVA_6_0_0
-        [CDVUserAgentUtil releaseLock:vc.userAgentLockToken];
-    #endif
+    [CDVUserAgentUtil releaseLock:vc.userAgentLockToken];
 
     NSString* message = [NSString stringWithFormat:@"Failed to load webpage with error: %@", [error localizedDescription]];
     NSLog(@"%@", message);

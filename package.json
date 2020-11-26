@@ -1,34 +1,59 @@
 {
-  "name": "cordova-plugin-wkwebview-engine",
-  "version": "1.1.6",
-  "description": "The official Apache Cordova WKWebView Engine Plugin",
-  "main": "index.js",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/ionic-team/cordova-plugin-wkwebview-engine"
+  "_from": "cordova-plugin-ionic-wkwebview-engine@^1.1.4",
+  "_id": "cordova-plugin-ionic-wkwebview-engine@1.1.4",
+  "_inBundle": false,
+  "_integrity": "sha512-h5jWVgqt465U/tHl2ykaDh6FVC1C7z6dGVnS3LnAU0PVUB6nfuxm2cTiVY9b3zg94+ijNDxOs8L7bmKtpT15ow==",
+  "_location": "/cordova-plugin-ionic-wkwebview-engine",
+  "_phantomChildren": {},
+  "_requested": {
+    "type": "range",
+    "registry": true,
+    "raw": "cordova-plugin-ionic-wkwebview-engine@^1.1.4",
+    "name": "cordova-plugin-ionic-wkwebview-engine",
+    "escapedName": "cordova-plugin-ionic-wkwebview-engine",
+    "rawSpec": "^1.1.4",
+    "saveSpec": null,
+    "fetchSpec": "^1.1.4"
+  },
+  "_requiredBy": [
+    "#USER"
+  ],
+  "_resolved": "https://registry.npmjs.org/cordova-plugin-ionic-wkwebview-engine/-/cordova-plugin-ionic-wkwebview-engine-1.1.4.tgz",
+  "_shasum": "a2b56104da88962ce69483d4ad1e8f2cc7f0b9d2",
+  "_spec": "cordova-plugin-ionic-wkwebview-engine@^1.1.4",
+  "_where": "/Users/salonhub/Projects/MobileApps/build/src",
+  "author": {
+    "name": "Apache Cordova"
   },
   "bugs": {
     "url": "https://github.com/ionic-team/cordova-plugin-wkwebview-engine/issues"
   },
+  "bundleDependencies": false,
+  "deprecated": false,
+  "description": "The official Apache Cordova WKWebView Engine Plugin",
+  "devDependencies": {
+    "jshint": "^2.6.0"
+  },
+  "directories": {
+    "test": "tests"
+  },
+  "homepage": "https://github.com/ionic-team/cordova-plugin-wkwebview-engine#readme",
   "keywords": [
     "cordova",
     "wkwebview"
   ],
+  "license": "Apache-2.0",
+  "main": "index.js",
+  "name": "cordova-plugin-ionic-wkwebview-engine",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ionic-team/cordova-plugin-wkwebview-engine.git"
+  },
   "scripts": {
-    "test": "npm run eslint && npm run objc-tests",
+    "jshint": "jshint src",
     "objc-tests": "cd tests/ios && npm test",
     "preobjc-tests": "cd tests/ios && npm install",
-    "eslint": "node_modules/.bin/eslint src"
+    "test": "npm run jshint && npm run objc-tests"
   },
-  "author": "Apache Cordova",
-  "license": "Apache-2.0",
-  "devDependencies": {
-    "eslint": "^3.19.0",
-    "eslint-config-semistandard": "^11.0.0",
-    "eslint-config-standard": "^10.2.1",
-    "eslint-plugin-import": "^2.3.0",
-    "eslint-plugin-node": "^5.0.0",
-    "eslint-plugin-promise": "^3.5.0",
-    "eslint-plugin-standard": "^3.0.1"
-  }
+  "version": "1.1.4"
 }
