@@ -150,6 +150,16 @@
     if (settings == nil) {
         return configuration;
     }
+
+    NSString *userAgent = configuration.applicationNameForUserAgent;
+    if (
+        [settings cordovaSettingForKey:@"OverrideUserAgent"] == nil &&
+        [settings cordovaSettingForKey:@"AppendUserAgent"] != nil
+        ) {
+        userAgent = [NSString stringWithFormat:@"%@ %@", userAgent, [settings cordovaSettingForKey:@"AppendUserAgent"]];
+    }
+    configuration.applicationNameForUserAgent = userAgent;
+
     configuration.allowsInlineMediaPlayback = [settings cordovaBoolSettingForKey:@"AllowInlineMediaPlayback" defaultValue:YES];
     configuration.suppressesIncrementalRendering = [settings cordovaBoolSettingForKey:@"SuppressesIncrementalRendering" defaultValue:NO];
     configuration.allowsAirPlayForMediaPlayback = [settings cordovaBoolSettingForKey:@"MediaPlaybackAllowsAirPlay" defaultValue:YES];
@@ -206,8 +216,9 @@
     wkWebView.UIDelegate = self.uiDelegate;
     self.engineWebView = wkWebView;
 
-    if (IsAtLeastiOSVersion(@"9.0") && [self.viewController isKindOfClass:[CDVViewController class]]) {
-        wkWebView.customUserAgent = ((CDVViewController*) self.viewController).userAgent;
+    NSString * overrideUserAgent = [settings cordovaSettingForKey:@"OverrideUserAgent"];
+    if (overrideUserAgent != nil) {
+        wkWebView.customUserAgent = overrideUserAgent;
     }
 
     if ([self.viewController conformsToProtocol:@protocol(WKUIDelegate)]) {
@@ -550,8 +561,10 @@ static void * KVOContext = &KVOContext;
 
 - (void)webView:(WKWebView*)webView didFinishNavigation:(WKNavigation*)navigation
 {
-    CDVViewController* vc = (CDVViewController*)self.viewController;
-    [CDVUserAgentUtil releaseLock:vc.userAgentLockToken];
+    #ifndef __CORDOVA_6_0_0
+        CDVViewController* vc = (CDVViewController*)self.viewController;
+        [CDVUserAgentUtil releaseLock:vc.userAgentLockToken];
+    #endif
 
     [[NSNotificationCenter defaultCenter] postNotification:[NSNotification notificationWithName:CDVPageDidLoadNotification object:webView]];
 }
@@ -564,7 +577,9 @@ static void * KVOContext = &KVOContext;
 - (void)webView:(WKWebView*)theWebView didFailNavigation:(WKNavigation*)navigation withError:(NSError*)error
 {
     CDVViewController* vc = (CDVViewController*)self.viewController;
-    [CDVUserAgentUtil releaseLock:vc.userAgentLockToken];
+    #ifndef __CORDOVA_6_0_0
+        [CDVUserAgentUtil releaseLock:vc.userAgentLockToken];
+    #endif
 
     NSString* message = [NSString stringWithFormat:@"Failed to load webpage with error: %@", [error localizedDescription]];
     NSLog(@"%@", message);
